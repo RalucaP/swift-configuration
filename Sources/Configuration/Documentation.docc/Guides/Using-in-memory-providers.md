@@ -89,7 +89,7 @@ The ``MutableInMemoryProvider`` allows you to modify configuration values at run
 #### Basic usage
 
 ```swift
-let provider = MutableInMemoryProvider()
+let provider = MutableInMemoryProvider(initialValues: [:])
 provider.setValue("localhost", forKey: "database.host")
 provider.setValue(5432, forKey: "database.port")
 
@@ -107,6 +107,28 @@ provider.setValue("debug", forKey: "logging.level")
 
 // Later in your application, watchers are notified
 provider.setValue("info", forKey: "logging.level") 
+```
+
+#### Updating multiple values at once
+
+To change several values in one step, use ``MutableInMemoryProvider/setValues(_:)``. Readers and snapshots never see some of the changes without the others:
+
+```swift
+provider.setValues([
+    "database.host": "db-a.example.com",
+    "database.port": 5433,
+])
+```
+
+To read values and update them in the same step, use ``MutableInMemoryProvider/withValues(_:)``. The closure runs while the provider is locked, so read the values it receives rather than calling the provider:
+
+```swift
+provider.withValues { values in
+    if values["database.host"] == "db-a.example.com" {
+        values["database.host"] = "db-b.example.com"
+        values["database.port"] = 6432
+    }
+}
 ```
 
 #### Watching for changes
@@ -170,12 +192,10 @@ Use ``MutableInMemoryProvider`` to bridge configuration from other systems:
 
 ```swift
 class ConfigurationBridge {
-    private let provider = MutableInMemoryProvider()
+    private let provider = MutableInMemoryProvider(initialValues: [:])
     
-    func updateFromExternalSystem(_ values: [String: ConfigValue]) {
-        for (key, value) in values {
-            provider.setValue(value, forKey: key)
-        }
+    func updateFromExternalSystem(_ values: [AbsoluteConfigKey: ConfigValue]) {
+        provider.setValues(values)
     }
 }
 ```
